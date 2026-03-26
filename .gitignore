@@ -2,6 +2,7 @@
 agent_data/
 models/
 results/
+data/
 
 # Python
 __pycache__/
