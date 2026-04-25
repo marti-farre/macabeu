@@ -6,8 +6,8 @@
 # Submit with: cd ~/macabeu && sbatch scripts/slurm_macabeu_pipeline_gemma.sh
 
 #SBATCH -J mac_gemma
-#SBATCH -p medium
-#SBATCH --gres=gpu:l40s:1
+#SBATCH -p high
+#SBATCH --gres=gpu:1
 #SBATCH --mem=48G
 #SBATCH -c 4
 #SBATCH --array=0-3
