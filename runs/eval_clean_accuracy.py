@@ -27,6 +27,8 @@ from victims.bilstm import VictimBiLSTM
 from utils.data_mappings import dataset_mapping, dataset_mapping_pairs
 
 from agent.defense_selector import RLDefenseSelector
+from agent.defense_env import DEFAULT_ACTION_SPACE, get_action_names
+from defenses.preprocessing import get_defense
 
 
 def evaluate_accuracy(victim, texts, labels, batch_size=32):
@@ -58,6 +60,8 @@ def main():
     parser.add_argument('policy_path', type=str)
     parser.add_argument('output_dir', type=str, nargs='?', default=None)
     parser.add_argument('--subset', type=str, default='attack')
+    parser.add_argument('--static_defenses', action='store_true',
+                        help='Also evaluate every static defense in the MACABEU action space')
 
     args = parser.parse_args()
     task = args.task
@@ -109,6 +113,21 @@ def main():
     base_f1 = compute_f1(base_preds, labels)
     print(f"  Accuracy: {base_acc:.4f}, F1: {base_f1:.4f}")
 
+    # Evaluate each static defense in the MACABEU action space
+    static_results = {}
+    if args.static_defenses:
+        action_names = get_action_names(DEFAULT_ACTION_SPACE)
+        for (def_name, def_param), label in zip(DEFAULT_ACTION_SPACE, action_names):
+            if def_name == 'none':
+                static_results[label] = {'acc': base_acc, 'f1': base_f1}
+                continue
+            print(f"\nEvaluating static defense '{label}'...")
+            defended = get_defense(def_name, base_victim, param=def_param, seed=42)
+            acc, preds = evaluate_accuracy(defended, texts, labels)
+            f1 = compute_f1(preds, labels)
+            print(f"  Accuracy: {acc:.4f}, F1: {f1:.4f}")
+            static_results[label] = {'acc': acc, 'f1': f1}
+
     # Evaluate RL defense selector
     print(f"\nLoading RL policy from {policy_path}...")
     rl_victim = RLDefenseSelector(base_victim, str(policy_path))
@@ -150,6 +169,12 @@ def main():
             f.write(f"# Action Distribution\n")
             for name, info in stats.items():
                 f.write(f"{name:<20s}: {info['count']:>5d} ({info['pct']:.1f}%)\n")
+            if static_results:
+                f.write(f"\n# Static Defenses (clean accuracy)\n")
+                for label, r in static_results.items():
+                    delta = r['acc'] - base_acc
+                    f.write(f"{label:<20s}: acc={r['acc']:.4f}, f1={r['f1']:.4f}, "
+                            f"delta_acc={delta:+.4f}\n")
         print(f"\nSaved to {out_file}")
 
 
