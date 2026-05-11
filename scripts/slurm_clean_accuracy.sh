@@ -9,7 +9,7 @@
 # Submit with: cd ~/macabeu && sbatch scripts/slurm_clean_accuracy.sh
 
 #SBATCH -J mac_acc
-#SBATCH -p medium
+#SBATCH -p high
 #SBATCH --gres=gpu:1
 #SBATCH --mem=48G
 #SBATCH -c 4
