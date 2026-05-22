@@ -11,11 +11,15 @@ MACABEU is a reinforcement learning agent that dynamically selects which preproc
 
 MACABEU is the defense counterpart to [XARELLO](https://aclanthology.org/2024.wassa-1.11/) (RL for adaptive attack). While XARELLO learns *which parts of the sentence to perturb*, MACABEU learns *which defense to apply* per example.
 
-The full evaluation covers up to **12 task–victim combinations** (4 BODEGA
+The full evaluation covers all **12 task–victim combinations** (4 BODEGA
 tasks × 3 victim classifiers: BiLSTM, BERT, Gemma-2B) under **5 attackers**
-(DeepWordBug, BERT-Attack, PWWS, Genetic, and XARELLO). The online MACABEU
-sweep was completed on 11 of the 12 combinations (HN-GEMMA online is excluded
-— see "Released policies" below).
+(DeepWordBug, BERT-Attack, PWWS, Genetic, and XARELLO). The headline
+XARELLO-vs-online-MACABEU sweep is complete on all 12 combinations; its
+per-combo outputs (including HN-GEMMA) live in the
+[`marti-farre/xarello`](https://github.com/marti-farre/xarello) repo under
+`results/xarello_vs_macabeu_online/`. The 4 standard-attacker online policy
+snapshots released in this repo cover 11 of the 12 combinations — see
+"Released policies" below.
 
 Built on top of the [BODEGA](https://doi.org/10.1017/nlp.2024.54) benchmark
 (this paper uses the [`marti-farre/BODEGA`](https://github.com/marti-farre/BODEGA)
@@ -181,7 +185,7 @@ reproduce the headline numbers without re-running training:
 | Path | Contents |
 |------|----------|
 | `models/{TASK}_{VICTIM}.pth` | Offline policy per (task, victim). 12 files. |
-| `results/online/online_model_{TASK}_{VICTIM}_{ATTACKER}.pth` | Online policy snapshots after each attacker evaluation (4 attackers × 11 task–victim combos; HN-GEMMA online evaluation was not completed and is excluded). |
+| `results/online/online_model_{TASK}_{VICTIM}_{ATTACKER}.pth` | Online policy snapshots from the 4 standard attackers (DeepWordBug, BERT-Attack, PWWS, Genetic). 44 files = 4 attackers × 11 task–victim combos; the HN-GEMMA online run for these 4 standard attackers was not executed (the headline XARELLO-vs-online-MACABEU sweep, which *was* run end-to-end for HN-GEMMA, is released in the `xarello` repo under `results/xarello_vs_macabeu_online/`). |
 
 Each `.pth` file is ~16 KB; the full release is ~1.6 MB.
 The matching `agent_data/*.npz` (raw per-example features + rewards used to
