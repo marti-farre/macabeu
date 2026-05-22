@@ -1,10 +1,27 @@
 # MACABEU: RL-Based Adaptive Defense Selector for BODEGA
 
+> **Paper companion.** This repository implements MACABEU, the adaptive defender
+> introduced in *"Fight Fire with Fire: Adaptive Black-Box Defences for
+> Misinformation Detection"* (M. Farré, P. Przybyła; under review at EMNLP 2026).
+> The pre-trained policies used in every experiment of the paper are released
+> under [`models/`](models/) (offline) and
+> [`results/online/`](results/online/) (online).
+
 MACABEU is a reinforcement learning agent that dynamically selects which preprocessing defense to apply to each input text at inference time, protecting NLP classifiers against adversarial attacks. It uses a **contextual bandit** formulation: a lightweight Q-network maps 10 statistical text features to one of 8 defense actions, choosing the best defense per input.
 
-MACABEU is the defense counterpart to [XARELLO](https://aclanthology.org/2024.wassa-1.11/) (RL for adaptive attack). While XARELLO learns *which parts of the sentence can be modified to succesfully attack* , MACABEU learns *which defense* to apply.
+MACABEU is the defense counterpart to [XARELLO](https://aclanthology.org/2024.wassa-1.11/) (RL for adaptive attack). While XARELLO learns *which parts of the sentence to perturb*, MACABEU learns *which defense to apply* per example.
 
-Built on top of the [BODEGA](https://doi.org/10.1017/nlp.2024.54) benchmark for adversarial robustness in misinformation detection.
+The full evaluation covers up to **12 task–victim combinations** (4 BODEGA
+tasks × 3 victim classifiers: BiLSTM, BERT, Gemma-2B) under **5 attackers**
+(DeepWordBug, BERT-Attack, PWWS, Genetic, and XARELLO). The online MACABEU
+sweep was completed on 11 of the 12 combinations (HN-GEMMA online is excluded
+— see "Released policies" below).
+
+Built on top of the [BODEGA](https://doi.org/10.1017/nlp.2024.54) benchmark
+(this paper uses the [`marti-farre/BODEGA`](https://github.com/marti-farre/BODEGA)
+fork, which adds the static defence library MACABEU selects over) and uses
+[`marti-farre/xarello`](https://github.com/marti-farre/xarello) as the adaptive
+attacker.
 
 ## Architecture
 
@@ -40,21 +57,25 @@ Built on top of the [BODEGA](https://doi.org/10.1017/nlp.2024.54) benchmark for 
 
 ### Prerequisites
 
-1. Clone BODEGA as a sibling directory:
-   ```
-   git clone <bodega-repo-url> BODEGA
-   git clone <macabeu-repo-url> macabeu
+1. Clone all three repos as siblings (the paper's fork of BODEGA + XARELLO):
+   ```bash
+   git clone https://github.com/marti-farre/BODEGA.git
+   git clone https://github.com/marti-farre/macabeu.git
+   git clone https://github.com/marti-farre/xarello.git   # optional, only for XARELLO eval
    ```
 
-2. Set up the conda environment (shared with BODEGA):
+2. Set up the conda environment (shared with BODEGA / XARELLO). The versions
+   below are the exact ones used to produce every number in the paper:
    ```bash
    conda create -n bodega python=3.10
    conda activate bodega
-   conda install pytorch pytorch-cuda=11.8 -c pytorch -c nvidia
-   pip install "transformers==4.38.1"
-   pip install OpenAttack
-   pip install bert-score editdistance
-   pip install symspellpy    # for OOV feature extraction
+   conda install pytorch=2.7.1 pytorch-cuda=11.8 -c pytorch -c nvidia
+   pip install "transformers==4.46.3" "tokenizers==0.20.3" "datasets==4.7.0"
+   pip install "OpenAttack==2.1.1"
+   pip install "bert-score==0.3.13" "editdistance==0.8.1"
+   pip install "symspellpy==6.9.0" "homoglyphs==2.0.4"
+   pip install git+https://github.com/lucadiliello/bleurt-pytorch.git   # 0.0.1
+   pip install "peft==0.18.1" "bitsandbytes==0.49.2" "accelerate==1.13.0"  # Gemma victim only
    ```
 
 3. Set PYTHONPATH:
@@ -152,6 +173,44 @@ Online mode can optionally warm-start from an offline model (`--pretrained` flag
 | 6 | `spellcheck_mv@3` | Spellcheck + 3x majority vote | 0.05 |
 | 7 | `char_noise@0.10` | Add 10% Unicode noise | 0.00 |
 
+## Released policies
+
+The policies used in the paper are tracked in this repo so reviewers can
+reproduce the headline numbers without re-running training:
+
+| Path | Contents |
+|------|----------|
+| `models/{TASK}_{VICTIM}.pth` | Offline policy per (task, victim). 12 files. |
+| `results/online/online_model_{TASK}_{VICTIM}_{ATTACKER}.pth` | Online policy snapshots after each attacker evaluation (4 attackers × 11 task–victim combos; HN-GEMMA online evaluation was not completed and is excluded). |
+
+Each `.pth` file is ~16 KB; the full release is ~1.6 MB.
+The matching `agent_data/*.npz` (raw per-example features + rewards used to
+fit the offline Q-network) is **not** released — it can be regenerated from
+the BODEGA attack splits via `runs/generate_defense_data.py`.
+
+## Reproducing the paper
+
+To reproduce the central RQ3 result (online MACABEU vs adaptive attacker
+across all 12 task–victim combinations):
+
+```bash
+# 0. Sibling repos cloned + bodega conda env active + PYTHONPATH=../BODEGA:.
+# 1. Train all 12 BODEGA victims (see ../BODEGA/runs/train_victims.py).
+# 2. Evaluate offline MACABEU against XARELLO on a (task, victim) combo:
+python runs/eval_defense_agent.py PR2 BiLSTM \
+    ../BODEGA/data/PR2 ../BODEGA/data/PR2/BiLSTM-512.pth \
+    models/PR2_BiLSTM.pth results/offline/PR2_BiLSTM/
+# 3. Evaluate online MACABEU on the same combo (no pretrained policy needed):
+python runs/eval_online.py PR2 BiLSTM \
+    ../BODEGA/data/PR2 ../BODEGA/data/PR2/BiLSTM-512.pth \
+    results/online/PR2/
+```
+
+The full sweep over (12 victims × 5 attackers × {offline, online}) is wired
+into `scripts/run_all_tasks.sh`. Aggregated tables and figures are produced
+by [`paper_assets/`](https://github.com/marti-farre/BODEGA/tree/main/paper_assets)
+in the BODEGA fork.
+
 ## Project Structure
 
 ```
@@ -173,13 +232,24 @@ macabeu/
 │   ├── run_all_tasks.sh          #   All 4 tasks, offline + online
 │   └── run_cross_attacker.sh     #   Leave-one-out generalization
 ├── explanations/                 # Experiment documentation
-├── agent_data/                   #   Generated NPZ training data (gitignored)
-├── models/                       #   Trained policy checkpoints (gitignored)
-└── results/                      #   Experiment outputs (gitignored)
+├── models/                       #   Offline policy checkpoints (released, .pth tracked)
+├── results/online/               #   Online policy checkpoints (released, .pth tracked)
+└── agent_data/                   #   NPZ training data (gitignored, regenerable)
+```
+
+## Citation
+
+```bibtex
+@misc{farre2026fightfire,
+  title  = {Fight Fire with Fire: Adaptive Black-Box Defences for Misinformation Detection},
+  author = {Farr{\'e} Farr{\'u}s, Mart{\'\i} and Przyby{\l}a, Piotr},
+  year   = {2026},
+  note   = {Under review.}
+}
 ```
 
 ## References
 
-- **BODEGA**: [Verifying the Robustness of Automatic Credibility Assessment](https://doi.org/10.1017/nlp.2024.54) (NLP Journal)
-- **XARELLO**: [Know Thine Enemy: Adaptive Attacks on Misinformation Detection Using Reinforcement Learning](https://aclanthology.org/2024.wassa-1.11/) (WASSA @ ACL 2024)
+- **BODEGA**: [Verifying the Robustness of Automatic Credibility Assessment](https://doi.org/10.1017/nlp.2024.54) (NLP Journal). This repo uses the [`marti-farre/BODEGA`](https://github.com/marti-farre/BODEGA) fork that adds the static defence library.
+- **XARELLO**: [Know Thine Enemy: Adaptive Attacks on Misinformation Detection Using Reinforcement Learning](https://aclanthology.org/2024.wassa-1.11/) (WASSA @ ACL 2024). Implementation at [`marti-farre/xarello`](https://github.com/marti-farre/xarello).
 - Developed within the [ERINIA](https://www.upf.edu/web/erinia) project at the [TALN lab](https://www.upf.edu/web/taln/), Universitat Pompeu Fabra.
