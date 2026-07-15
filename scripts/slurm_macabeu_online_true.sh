@@ -10,7 +10,7 @@
 #SBATCH -p high
 #SBATCH --gres=gpu:1
 #SBATCH --constraint=cuda
-#SBATCH --mem=48G
+#SBATCH --mem=32G
 #SBATCH -c 4
 #SBATCH --array=0-47
 #SBATCH -o logs/mac_on_true_%A_%a.out
