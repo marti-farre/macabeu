@@ -38,7 +38,8 @@ esac
 POLICY_PATH="models/${TASK}_${VICTIM}.pth"
 OUT_DIR="results/online_true_soft"
 
-source /soft/easybuild/x86_64/software/Miniconda3/22.11.1-1/etc/profile.d/conda.sh
+module load Anaconda3/2023.09-0
+eval "$(conda shell.bash hook)"
 conda activate bodega
 export PYTHONPATH="../BODEGA:."
 mkdir -p "$OUT_DIR" logs
