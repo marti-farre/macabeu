@@ -176,6 +176,12 @@ def main():
                         help='Examples before epsilon reaches min')
     parser.add_argument('--semantic_scorer', type=str, default='BERTscore',
                         choices=['BERTscore', 'BLEURT'])
+    parser.add_argument('--label_source', type=str, default='oracle',
+                        choices=['oracle', 'mv7'],
+                        help='oracle=gold label (unrealistic); mv7=MajorityVote-7 pseudo-label.')
+    parser.add_argument('--reward_mode', type=str, default='hard',
+                        choices=['hard', 'soft'],
+                        help='hard=±1; soft=±p (winning vote fraction). Only for mv7.')
     args = parser.parse_args()
 
     task = args.task
@@ -225,7 +231,9 @@ def main():
             min_eps=args.min_eps,
             warmup_examples=args.warmup,
             pretrained_path=args.pretrained,
-            verbose=False
+            verbose=False,
+            label_source=args.label_source,
+            reward_mode=args.reward_mode,
         )
 
         with no_ssl_verify():

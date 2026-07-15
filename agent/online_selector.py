@@ -51,8 +51,22 @@ class OnlineRLDefenseSelector(OpenAttack.Classifier):
         batch_size: int = 16,
         buffer_size: int = 5000,
         pretrained_path: Optional[str] = None,
-        verbose: bool = False
+        verbose: bool = False,
+        label_source: str = 'oracle',
+        reward_mode: str = 'hard',
+        mv_k: int = 7,
+        mv_perturb_prob: float = 0.1,
     ):
+        # label_source: 'oracle' uses the gold label; 'mv7' derives a pseudo-label
+        # from a MajorityVote(k=mv_k) wrapper on the base victim (no gold access).
+        # reward_mode: 'hard' → ±1; 'soft' → ±p where p is the winning vote fraction.
+        if label_source not in ('oracle', 'mv7'):
+            raise ValueError(f"label_source must be 'oracle' or 'mv7', got {label_source}")
+        if reward_mode not in ('hard', 'soft'):
+            raise ValueError(f"reward_mode must be 'hard' or 'soft', got {reward_mode}")
+        self.label_source = label_source
+        self.reward_mode = reward_mode
+
         self.victim = victim
         self.action_space = action_space or DEFAULT_ACTION_SPACE
         self.verbose = verbose
@@ -94,6 +108,15 @@ class OnlineRLDefenseSelector(OpenAttack.Classifier):
                     defense_name, victim, param=param,
                     seed=seed, verbose=False
                 )
+
+        # Pseudo-label estimator for true-online mode. Independent from the
+        # action-space MV to keep the two RNGs decoupled.
+        self.mv_estimator = None
+        if self.label_source == 'mv7':
+            self.mv_estimator = get_defense(
+                'majority_vote', victim, param=mv_k,
+                seed=seed + 1000, verbose=False)
+            self.mv_estimator.perturbation_prob = mv_perturb_prob
 
         # Tracking for current example
         self._current_features = None
@@ -146,8 +169,19 @@ class OnlineRLDefenseSelector(OpenAttack.Classifier):
         if self._current_features is None:
             return
 
-        # Reward: correct prediction = +1, wrong = -1, minus cost
-        correct = 1.0 if prediction_after_attack == true_label else -1.0
+        if self.label_source == 'mv7':
+            # Deployment-realistic pseudo-label: no gold access. MV(k) gives us
+            # a vote-fraction distribution over classes on the last-seen text.
+            probs = self.mv_estimator.get_prob([self._current_text])[0]
+            pseudo_label = int(np.argmax(probs))
+            p = float(probs[pseudo_label])
+            match = (prediction_after_attack == pseudo_label)
+            if self.reward_mode == 'soft':
+                correct = p if match else -p
+            else:
+                correct = 1.0 if match else -1.0
+        else:
+            correct = 1.0 if prediction_after_attack == true_label else -1.0
         cost = DEFENSE_COSTS.get(self._current_action, 0.0)
         reward = correct - cost
 
