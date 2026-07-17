@@ -34,8 +34,12 @@ MODEL_PATH="../BODEGA/data/$TASK/${VICTIM}-512.pth"
 POLICY_PATH="models/${TASK}_${VICTIM}.pth"
 OUT_DIR="results/online_true_hard"
 
-module load Anaconda3/2023.09-0
-eval "$(conda shell.bash hook)"
+CONDA_SH=/soft/easybuild/x86_64/software/Anaconda3/2023.09-0/etc/profile.d/conda.sh
+if [ ! -f "$CONDA_SH" ]; then
+    echo "ERROR: conda.sh not found on $(hostname): $CONDA_SH" >&2
+    exit 1
+fi
+source "$CONDA_SH"
 conda activate bodega
 export PYTHONPATH="../BODEGA:."
 mkdir -p "$OUT_DIR" logs
